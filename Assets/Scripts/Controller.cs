@@ -1,36 +1,61 @@
-using System.Collections;
-using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
 public class Controller : MonoBehaviour
 {
-    public enum Polarity { North, South } 
-    [SerializeField] private Polarity currentPolarity;           // 극성 설정
+    public enum Polarity { North, South }
+
+    [Header("극성 설정")]
+    [SerializeField] private Polarity currentPolarity = Polarity.North;
+    [SerializeField] private SpriteRenderer spriteRenderer;
+
+    [Header("자력 설정")]
     [SerializeField] private float attractionForce = 5f;
     [SerializeField] private float repulsionForce = 3f;
+    [SerializeField] private float detectRadius = 5f;
+    [SerializeField] private LayerMask magnetLayer;
+
+    [Header("이동 설정")]
+    [SerializeField] private float moveSpeed = 2f;
 
     private Rigidbody2D rb;
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-        
+        spriteRenderer = GetComponent<SpriteRenderer>();
+
+        UpdateColor();
     }
 
-  
+    void FixedUpdate()
+    {
+        // X축은 일정 속도로 진행, Y축은 자력에 의해 변화
+        rb.velocity = new Vector2(moveSpeed, rb.velocity.y);
+    }
+
     void Update()
     {
         if (Input.GetMouseButtonDown(0))
         {
-            currentPolarity = (currentPolarity == Polarity.North) ? Polarity.South : Polarity.North;
-            
-          
+            TogglePolarity();
         }
+
         DetectClosestMagnet();
     }
 
-    [SerializeField] private float detectRadius = 5f;
-    [SerializeField] private LayerMask magnetLayer;
+    void TogglePolarity()
+    {
+        currentPolarity = (currentPolarity == Polarity.North) ? Polarity.South : Polarity.North;
+        UpdateColor();
+    }
+
+    void UpdateColor()
+    {
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = (currentPolarity == Polarity.North) ? Color.blue : Color.red;
+        }
+    }
 
     void DetectClosestMagnet()
     {
@@ -41,7 +66,12 @@ public class Controller : MonoBehaviour
 
         foreach (var hit in hits)
         {
-            float dist = Vector2.Distance(transform.position, hit.transform.position);
+            Vector2 offset = hit.transform.position - transform.position;
+
+            // 위/아래 자석만 감지: Y축 차이가 충분히 큰 경우만
+            if (Mathf.Abs(offset.y) < 0.5f) continue;
+
+            float dist = offset.sqrMagnitude;
             if (dist < minDist)
             {
                 minDist = dist;
@@ -54,23 +84,22 @@ public class Controller : MonoBehaviour
             ApplyMagnetForce(closest);
         }
     }
+
     void ApplyMagnetForce(Transform magnetTransform)
     {
-        // 자석 극성 얻기 (자석에 MagnetComponent 스크립트가 있다고 가정)
-        Polarity magnetPolarity = magnetTransform.GetComponent<Magnet>().Polarity;
+        Magnet magnet = magnetTransform.GetComponent<Magnet>();
+        if (magnet == null) return;
 
-        // 방향 벡터 계산
         Vector2 direction = (magnetTransform.position - transform.position).normalized;
 
-        // 같은 극이면 밀어내기, 다른 극이면 끌어당김
-        if (currentPolarity == magnetPolarity)
+        if (magnet.Polarity == currentPolarity)
         {
-            // 반발력
+            // 같은 극 → 반발
             rb.AddForce(-direction * repulsionForce, ForceMode2D.Force);
         }
         else
         {
-            // 인력
+            // 다른 극 → 인력
             rb.AddForce(direction * attractionForce, ForceMode2D.Force);
         }
     }
