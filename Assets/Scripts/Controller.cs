@@ -1,35 +1,47 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 public class Controller : MonoBehaviour
 {
     public enum Polarity { North, South }
 
-    [Header("±Ø¼º ¼³Á¤")]
+    [Header("ê·¹ì„± ì„¤ì •")]
     [SerializeField] private Polarity currentPolarity = Polarity.North;
     [SerializeField] private SpriteRenderer spriteRenderer;
 
-    [Header("ÀÚ·Â ¼³Á¤")]
+    [Header("ìë ¥ ì„¤ì •")]
     [SerializeField] private float attractionForce = 5f;
     [SerializeField] private float repulsionForce = 3f;
     [SerializeField] private float detectRadius = 5f;
     [SerializeField] private LayerMask magnetLayer;
 
-    [Header("ÀÌµ¿ ¼³Á¤")]
+    [Header("ì´ë™ ì„¤ì •")]
     [SerializeField] private float moveSpeed = 2f;
 
     private Rigidbody2D rb;
+
+    // ì´ˆê¸°í™”ìš© 
+    private Vector3 initialPosition;
+    private Polarity initialPolarity;
+
+
+    public bool IsControllable { get; set; } = false; 
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
 
+        // ì´ˆê¸° ìƒíƒœ ì €ì¥
+        initialPosition = transform.position;
+        initialPolarity = currentPolarity;
+
         UpdateColor();
     }
 
     void FixedUpdate()
     {
-        // XÃàÀº ÀÏÁ¤ ¼Óµµ·Î ÁøÇà, YÃàÀº ÀÚ·Â¿¡ ÀÇÇØ º¯È­
+        if (!IsControllable) return;
+
         rb.velocity = new Vector2(moveSpeed, rb.velocity.y);
     }
 
@@ -68,7 +80,7 @@ public class Controller : MonoBehaviour
         {
             Vector2 offset = hit.transform.position - transform.position;
 
-            // À§/¾Æ·¡ ÀÚ¼®¸¸ °¨Áö: YÃà Â÷ÀÌ°¡ ÃæºĞÈ÷ Å« °æ¿ì¸¸
+            // ìœ„/ì•„ë˜ ìì„ë§Œ ê°ì§€: Yì¶• ì°¨ì´ê°€ ì¶©ë¶„íˆ í° ê²½ìš°ë§Œ
             if (Mathf.Abs(offset.y) < 0.5f) continue;
 
             float dist = offset.sqrMagnitude;
@@ -84,23 +96,51 @@ public class Controller : MonoBehaviour
             ApplyMagnetForce(closest);
         }
     }
-
     void ApplyMagnetForce(Transform magnetTransform)
     {
         Magnet magnet = magnetTransform.GetComponent<Magnet>();
         if (magnet == null) return;
 
-        Vector2 direction = (magnetTransform.position - transform.position).normalized;
+        Vector2 offset = magnetTransform.position - transform.position;
+        float distance = offset.magnitude;
+        if (distance < 0.01f) distance = 0.01f;
+
+        Vector2 direction = offset.normalized;
 
         if (magnet.Polarity == currentPolarity)
         {
-            // °°Àº ±Ø ¡æ ¹İ¹ß
-            rb.AddForce(-direction * repulsionForce, ForceMode2D.Force);
+            // ê°™ì€ ê·¹ì„± â†’ ë°˜ë°œë ¥ (ê±°ë¦¬ ê¸°ë°˜)
+            float forceMagnitude = repulsionForce * (1f + (1f / distance)) * 0.3f;
+
+            // ğŸ’¡ ë°˜ë°œì€ impulse ëŠë‚Œ ìœ ì§€, ë°©í–¥ ì œí•œ ì—†ìŒ
+            rb.AddForce(-direction * forceMagnitude, ForceMode2D.Impulse);
         }
         else
         {
-            // ´Ù¸¥ ±Ø ¡æ ÀÎ·Â
-            rb.AddForce(direction * attractionForce, ForceMode2D.Force);
+            // ë‹¤ë¥¸ ê·¹ì„± â†’ ì¸ë ¥ (ê±°ë¦¬ì— ë”°ë¼ ì¤„ì—¬ë„ ë¨)
+            float forceMagnitude = attractionForce;
+            rb.AddForce(direction * forceMagnitude, ForceMode2D.Force);
         }
     }
+
+
+
+
+    public void ResetController()
+    {
+        // ìœ„ì¹˜ ë° ì†ë„ ì´ˆê¸°í™”
+        transform.position = initialPosition;
+        rb.velocity = Vector2.zero;
+        rb.angularVelocity = 0f;
+
+        // ê·¹ì„± ì´ˆê¸°í™”
+        currentPolarity = initialPolarity;
+        UpdateColor();
+    }
+    public void SetRadius()
+    {
+
+        detectRadius = 5f;
+    }
+
 }
