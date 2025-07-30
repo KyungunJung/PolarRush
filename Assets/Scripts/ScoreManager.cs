@@ -5,21 +5,30 @@ public class ScoreManager : MonoBehaviour
     public static ScoreManager Instance;
 
     public int Score { get; private set; }
-
+    public int BestScore { get; private set; }
+    
     private bool isCounting = false;
     private float elapsedTime = 0f;
+    public float upgradeTime= 0f;
 
     private int passedObstacleCount = 0;
     private int dangerScore = 0;
+
+    private const string BEST_SCORE_KEY = "BestScore";
 
     public enum DangerZone { Bad, Normal, Good, Sharp }
 
     void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+            LoadBestScore();
+        }
         else
+        {
             Destroy(gameObject);
+        }
     }
 
     void Update()
@@ -29,8 +38,6 @@ public class ScoreManager : MonoBehaviour
         elapsedTime += Time.deltaTime;
 
         Score = Mathf.FloorToInt(GetTimeScore()) + (passedObstacleCount * 10) + dangerScore;
-
-        // Debug.Log($"TimeScore: {GetTimeScore()}, Obstacles: {passedObstacleCount}, Danger: {dangerScore}, Total: {Score}");
     }
 
     public void StartScoring()
@@ -42,6 +49,7 @@ public class ScoreManager : MonoBehaviour
     public void StopScoring()
     {
         isCounting = false;
+        TryUpdateBestScore();
     }
 
     public void AddPassedObstacle()
@@ -59,20 +67,19 @@ public class ScoreManager : MonoBehaviour
             case DangerZone.Sharp:
                 dangerScore += 3;
                 break;
-                // Bad, Normal 은 점수 없음
         }
     }
 
     private float GetTimeScore()
     {
-        if (elapsedTime <= 60f)
+        if (elapsedTime <= upgradeTime)
             return elapsedTime * 1f;
-        else if (elapsedTime <= 120f)
-            return 60f * 1f + (elapsedTime - 60f) * 3f;
-        else if (elapsedTime <= 180f)
-            return 60f * 1f + 60f * 3f + (elapsedTime - 120f) * 5f;
+        else if (elapsedTime <= (upgradeTime *2))
+            return upgradeTime * 1f + (elapsedTime - upgradeTime) * 3f;
+        else if (elapsedTime <= (upgradeTime * 3))
+            return upgradeTime * 1f + upgradeTime * 3f + (elapsedTime - (upgradeTime * 2)) * 5f;
         else
-            return 60f * 1f + 60f * 3f + 60f * 5f + (elapsedTime - 180f) * 6f;
+            return upgradeTime * 1f + upgradeTime * 3f + upgradeTime * 5f + (elapsedTime - (upgradeTime * 3)) * 6f;
     }
 
     public void ResetScore()
@@ -81,5 +88,20 @@ public class ScoreManager : MonoBehaviour
         elapsedTime = 0f;
         passedObstacleCount = 0;
         dangerScore = 0;
+    }
+
+    private void TryUpdateBestScore()
+    {
+        if (Score > BestScore)
+        {
+            BestScore = Score;
+            PlayerPrefs.SetInt(BEST_SCORE_KEY, BestScore);
+            PlayerPrefs.Save();
+        }
+    }
+
+    private void LoadBestScore()
+    {
+        BestScore = PlayerPrefs.GetInt(BEST_SCORE_KEY, 0);
     }
 }

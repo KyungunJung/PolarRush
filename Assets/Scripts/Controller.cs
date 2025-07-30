@@ -9,29 +9,38 @@ public class Controller : MonoBehaviour
     [SerializeField] private SpriteRenderer spriteRenderer;
 
     [Header("자력 설정")]
-    [SerializeField] private float attractionForce = 5f;
-    [SerializeField] private float repulsionForce = 3f;
+    [SerializeField] private float attractionForce = 300f;
+    [SerializeField] private float repulsionForce = 180f;
     [SerializeField] private float detectRadius = 5f;
     [SerializeField] private LayerMask magnetLayer;
 
-    [Header("이동 설정")]
-    [SerializeField] private float moveSpeed = 2f;
+    [Header("사망 조건")]
+    [SerializeField] private float screenTopY = 6f;
+    [SerializeField] private float screenBottomY = -6f;
+    [SerializeField] private float killDistance = 0.5f;
 
     private Rigidbody2D rb;
 
-    // 초기화용 
     private Vector3 initialPosition;
     private Polarity initialPolarity;
 
+    public bool IsControllable { get; set; } = false;
 
-    public bool IsControllable { get; set; } = false; 
+    private bool isDead = false;
+
+    private Vector2 accumulatedImpulse = Vector2.zero;
+    private Vector2 accumulatedForce = Vector2.zero;
+
+    void Awake()
+    {
+        Application.targetFrameRate = 60;
+    }
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
 
-        // 초기 상태 저장
         initialPosition = transform.position;
         initialPolarity = currentPolarity;
 
@@ -40,19 +49,35 @@ public class Controller : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (!IsControllable) return;
+        if (!IsControllable || isDead) return;
 
-        rb.velocity = new Vector2(moveSpeed, rb.velocity.y);
+        // 반발력 처리 (Impulse)
+        if (accumulatedImpulse != Vector2.zero)
+        {
+            rb.AddForce(accumulatedImpulse, ForceMode2D.Impulse);
+            accumulatedImpulse = Vector2.zero;
+        }
+
+        // 인력 처리 (Force)
+        if (accumulatedForce != Vector2.zero)
+        {
+            rb.AddForce(accumulatedForce * Time.fixedDeltaTime, ForceMode2D.Force);
+            accumulatedForce = Vector2.zero;
+        }
     }
 
     void Update()
     {
+        if (!IsControllable || isDead) return;
+
         if (Input.GetMouseButtonDown(0))
         {
             TogglePolarity();
         }
 
         DetectClosestMagnet();
+        CheckDeathByPosition();
+        CheckDeathByPolarity();
     }
 
     void TogglePolarity()
@@ -79,8 +104,6 @@ public class Controller : MonoBehaviour
         foreach (var hit in hits)
         {
             Vector2 offset = hit.transform.position - transform.position;
-
-            // 위/아래 자석만 감지: Y축 차이가 충분히 큰 경우만
             if (Mathf.Abs(offset.y) < 0.5f) continue;
 
             float dist = offset.sqrMagnitude;
@@ -96,51 +119,104 @@ public class Controller : MonoBehaviour
             ApplyMagnetForce(closest);
         }
     }
+
     void ApplyMagnetForce(Transform magnetTransform)
     {
         Magnet magnet = magnetTransform.GetComponent<Magnet>();
         if (magnet == null) return;
 
         Vector2 offset = magnetTransform.position - transform.position;
-        float distance = offset.magnitude;
-        if (distance < 0.01f) distance = 0.01f;
-
+        float distance = Mathf.Max(offset.magnitude, 0.01f);
         Vector2 direction = offset.normalized;
 
         if (magnet.Polarity == currentPolarity)
         {
-            // 같은 극성 → 반발력 (거리 기반)
+            // 반발력 (위로 밀어냄)
             float forceMagnitude = repulsionForce * (1f + (1f / distance)) * 0.3f;
-
-            // 💡 반발은 impulse 느낌 유지, 방향 제한 없음
-            rb.AddForce(-direction * forceMagnitude, ForceMode2D.Impulse);
+            accumulatedImpulse += -direction * forceMagnitude;
         }
         else
         {
-            // 다른 극성 → 인력 (거리에 따라 줄여도 됨)
+            // 인력 (아래로 당김)
             float forceMagnitude = attractionForce;
-            rb.AddForce(direction * forceMagnitude, ForceMode2D.Force);
+            accumulatedForce += direction * forceMagnitude;
         }
     }
 
+    void CheckDeathByPosition()
+    {
+        float y = transform.position.y;
+        if (y > screenTopY || y < screenBottomY)
+        {
+            Die("OutOfBounds");
+        }
+    }
 
+    void CheckDeathByPolarity()
+    {
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, detectRadius, magnetLayer);
 
+        foreach (var hit in hits)
+        {
+            Magnet magnet = hit.GetComponent<Magnet>();
+            if (magnet == null) continue;
+
+            if (magnet.Polarity != currentPolarity)
+            {
+                float dist = Vector2.Distance(transform.position, hit.transform.position);
+                if (dist < killDistance)
+                {
+                    Die("OppositePolarity");
+                    break;
+                }
+            }
+        }
+    }
+
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (isDead) return;
+
+        Magnet magnet = collision.gameObject.GetComponent<Magnet>();
+        if (magnet == null) return;
+
+        if (magnet.Polarity != currentPolarity)
+        {
+            Die("CollidedWithOppositePolarity");
+        }
+    }
+
+    void Die(string reason)
+    {
+        if (isDead) return;
+        isDead = true;
+
+        IsControllable = false;
+        rb.velocity = Vector2.zero;
+        rb.isKinematic = true;
+
+        ScoreManager.Instance?.StopScoring();
+        UIManager.Instance?.GameOver();
+
+        Debug.Log($"플레이어 사망 - 이유: {reason}");
+    }
 
     public void ResetController()
     {
-        // 위치 및 속도 초기화
         transform.position = initialPosition;
         rb.velocity = Vector2.zero;
         rb.angularVelocity = 0f;
 
-        // 극성 초기화
         currentPolarity = initialPolarity;
+        isDead = false;
+        IsControllable = false;
+        rb.isKinematic = false;
+
         UpdateColor();
     }
+
     public void SetRadius()
     {
-
-        detectRadius = 5f;
+        detectRadius = 3f;
     }
-
 }
