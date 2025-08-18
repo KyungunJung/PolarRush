@@ -7,3 +7,6 @@ Polar Rush
 - 중독성 있는 플레이
 
 앞으로 다양한 모드와 캐릭터가 추가될 예정입니다. 많은 관심 부탁드려요!
+
+<출시 전 미리 PC 버전으로 체험해보기>
+https://drive.google.com/file/d/1jecWNIzcs1pE-C9K3JQYjA0Aq4lEj8ah/view?usp=sharing
