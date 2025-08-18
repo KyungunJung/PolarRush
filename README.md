@@ -15,4 +15,6 @@ https://drive.google.com/file/d/1jecWNIzcs1pE-C9K3JQYjA0Aq4lEj8ah/view?usp=shari
 
 <게임 플레이 영상 보기>
 (이미지 클릭 시 유튜브로 이동됩니다.)
+
+
 [![Polar Rush 영상 썸네일](https://img.youtube.com/vi/Z4IE9ry1alc/0.jpg)](https://youtube.com/shorts/Z4IE9ry1alc)
