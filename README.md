@@ -13,6 +13,9 @@ Polar Rush
 https://drive.google.com/file/d/1jecWNIzcs1pE-C9K3JQYjA0Aq4lEj8ah/view?usp=sharing
 
 
+![PolarRush](https://github.com/user-attachments/assets/5cb7a9cf-d00e-418f-962a-68380aa85568)
+
+
 <게임 플레이 영상 보기>
 (이미지 클릭 시 유튜브로 이동됩니다.)
 
